@@ -16,15 +16,20 @@ export async function executeOperation<
   let queryResolved = false;
 
   const result = execute({
-    ...cloneArgs(params),
-    query: (updatedArgs, updatedOperation = params.operation) => {
+    // Clone only `args` (the sole mutated field). Cloning the whole `params`
+    // re-deep-copied the `scope.parentParams` ancestor chain on every nested op —
+    // redundant work that grows sharply with nesting depth. `scope` is read-only,
+    // so sharing it by reference is safe.
+    ...params,
+    args: cloneArgs(params.args),
+    query: ((updatedArgs, updatedOperation = params.operation) => {
       queryCalledPromise.resolve({
         updatedArgs,
         updatedOperation,
       });
       queryResolved = true;
       return queryPromise.promise;
-    },
+    }) as typeof params.query,
   }).catch((e) => {
     // reject params updated callback so it throws when awaited
     queryCalledPromise.reject(e);
